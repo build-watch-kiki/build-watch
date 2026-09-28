@@ -4,19 +4,24 @@ x-backend-source: &backend-source
     context: ../backend
   pull_policy: build
 
+name: build-watch-source
+
 services:
   build-watch-init:
     <<: *backend-source
+    container_name: build-watch-source-init
 
   build-watch-backend:
     <<: *backend-source
+    container_name: build-watch-source-backend
 
   build-watch-backend-worker:
     <<: *backend-source
+    container_name: build-watch-source-backend-worker
 
   build-watch-model-init:
     <<: *backend-source
-    container_name: build-watch-model-init
+    container_name: build-watch-source-model-init
     entrypoint: ["python", "/scripts/seed_model.py"]
     env_file:
       - .env
@@ -36,6 +41,7 @@ services:
 
   build-watch-cv:
     image: build-watch-cv:submission-source
+    container_name: build-watch-source-cv
     build:
       context: ../cv
     pull_policy: build
@@ -48,8 +54,18 @@ services:
 
   build-watch-frontend:
     image: build-watch-frontend:submission-source
+    container_name: build-watch-source-frontend
     build:
       context: ../frontend
       args:
         VITE_SHOW_MOCK_PROJECT: "false"
     pull_policy: build
+
+  postgres:
+    container_name: build-watch-source-db
+
+  rabbitmq:
+    container_name: build-watch-source-rabbitmq
+
+  minio:
+    container_name: build-watch-source-minio

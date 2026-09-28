@@ -7,13 +7,15 @@
 
 | Каталог | Исходный репозиторий | Зафиксированная версия | Git commit |
 | --- | --- | --- | --- |
-| [`backend/`](backend/) | [`build-watch-backend`](https://github.com/build-watch-kiki/build-watch-backend) | `1.0.4` | `77135d1677e3019520a5b0913dd46c64f8f09e5f` |
-| [`cv/`](cv/) | [`build-watch-cv`](https://github.com/build-watch-kiki/build-watch-cv) | `1.0.2` | `e90e63781894ca1a55591cb34de539c3364d77ab` |
-| [`frontend/`](frontend/) | [`build-watch-frontend`](https://github.com/build-watch-kiki/build-watch-frontend) | `1.0.2` | `46f219bc9ef2399f3438f56c18af998e996c17ea` |
-| [`deploy/`](deploy/) | [`build-watch-deploy`](https://github.com/build-watch-kiki/build-watch-deploy) | снимок Compose | `99afbfc216ba9865ee7a6fbbb217b1bd3cf2e9f2` |
+| [`backend/`](backend/) | `build-watch-backend` | `1.0.4` | `77135d1677e3019520a5b0913dd46c64f8f09e5f` |
+| [`cv/`](cv/) | `build-watch-cv` | `1.0.2` | `e90e63781894ca1a55591cb34de539c3364d77ab` |
+| [`frontend/`](frontend/) | `build-watch-frontend` | `1.0.2` | `46f219bc9ef2399f3438f56c18af998e996c17ea` |
+| [`deploy/`](deploy/) | `build-watch-deploy` | снимок Compose | `99afbfc216ba9865ee7a6fbbb217b1bd3cf2e9f2` |
 
 Каталоги импортированы из Git-коммитов без локальных изменений и вложенных
-`.git`. Документация в `deploy/` описывает исходный репозиторий с образами;
+`.git`. Доступ к исходным четырём репозиториям для просмотра и запуска не нужен:
+их зафиксированные файлы полностью находятся здесь. Документация в `deploy/`
+описывает исходный репозиторий с образами;
 для воспроизводимого запуска **из кода этого репозитория** используйте команду ниже.
 
 ## Запуск из исходников
