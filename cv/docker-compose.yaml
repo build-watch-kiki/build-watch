@@ -1,0 +1,60 @@
+services:
+  cv-worker:
+    build:
+      context: .
+    container_name: cv-worker
+    env_file:
+      - .env
+    environment:
+      BROKER__HOST: ${BROKER__HOST:-rabbitmq}
+      S3__ENDPOINT: ${S3__ENDPOINT:-http://minio:9000}
+      # TEMP-DEBUG: локальный дамп (удалить перед продом).
+      # Перекрывает OUTPUT__DIR из .env: внутри контейнера пишем через маунт.
+      OUTPUT__DIR: /app/_cv_debug
+    volumes:
+      - ./buildwatchcv:/app/buildwatchcv
+      - model-cache:/tmp/models
+      - ../_cv_debug:/app/_cv_debug
+    networks:
+      - default
+    restart: unless-stopped
+
+  # Локальная infra для разработки. НЕ запускать одновременно с
+  # `build-watch-deploy --profile infra` — там те же container_name и порты.
+  # Запускается только с --profile local-infra
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: build-watch-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${BROKER__USERNAME:-guest}
+      RABBITMQ_DEFAULT_PASS: ${BROKER__PASSWORD:-guest}
+    ports:
+      - "${BROKER__PORT:-5672}:5672"
+      - "15672:15672"
+    restart: unless-stopped
+    profiles:
+      - local-infra
+
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: build-watch-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3__ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${S3__SECRET_KEY:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - mindata:/data
+    restart: unless-stopped
+    profiles:
+      - local-infra
+
+volumes:
+  model-cache:
+  mindata:
+
+networks:
+  default:
+    name: build-watch-cv_default

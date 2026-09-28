@@ -1,0 +1,25 @@
+[project]
+name = "build-watch-cv"
+version = "1.0.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "faststream[rabbit,cli]>=0.7.5",
+    "minio>=7.2.20",
+    "pydantic>=2.13.5",
+    "pydantic-settings>=2.15.0",
+    "pillow>=11.0",
+    "torch>=2.11.0",
+    "torchvision>=0.26.0",
+    "ultralytics>=8.3",
+]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+torchvision = { index = "pytorch-cpu" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

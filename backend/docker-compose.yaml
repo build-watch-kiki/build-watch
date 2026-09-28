@@ -1,0 +1,129 @@
+services:
+  app:
+    build:
+      context: .
+    container_name: backend
+    env_file:
+      - .env
+    environment: &backend_environment
+      # Внутри docker-сети должны указывать на имена сервисов.
+      # Эти значения имеют приоритет над .env — поэтому локальная инфра
+      # заработает даже если в .env прописаны удалённые 100.84.186.57.
+      # Если нужен удалённый стенд — закомментируй блок environment или
+      # запусти: DB__HOST=100.84.186.57 docker compose up app
+      DB__HOST: postgres
+      DB__PORT: 5432
+      DB__NAME: ${DB__NAME:-build-watch-db}
+      DB__USER: ${DB__USER:-postgres}
+      DB__PASSWORD: ${DB__PASSWORD:-postgres}
+      BROKER__HOST: rabbitmq
+      BROKER__PORT: 5672
+      BROKER__USERNAME: ${BROKER__USERNAME:-guest}
+      BROKER__PASSWORD: ${BROKER__PASSWORD:-guest}
+      S3__ENDPOINT: http://minio:9000
+      S3__ACCESS_KEY: ${S3__ACCESS_KEY:-minioadmin}
+      S3__SECRET_KEY: ${S3__SECRET_KEY:-minioadmin}
+      S3__BUCKET: ${S3__BUCKET:-buildwatch}
+    ports:
+      - "${RUN__PORT:-8000}:8000"
+    volumes:
+      - ./buildwatch:/app/buildwatch
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-m", "buildwatch.healthcheck"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+    container_name: backend-worker
+    command: ["faststream", "run", "buildwatch.worker:app"]
+    env_file:
+      - .env
+    environment:
+      <<: *backend_environment
+      RUN_MIGRATIONS: "0"
+    volumes:
+      - ./buildwatch:/app/buildwatch
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:18
+    container_name: backend-db
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${DB__NAME:-build-watch-db}
+      POSTGRES_USER: ${DB__USER:-postgres}
+      POSTGRES_PASSWORD: ${DB__PASSWORD:-postgres}
+    ports:
+      - "${DB__PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    profiles:
+      - infra
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: backend-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${BROKER__USERNAME:-guest}
+      RABBITMQ_DEFAULT_PASS: ${BROKER__PASSWORD:-guest}
+    ports:
+      - "${BROKER__PORT:-5672}:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+    profiles:
+      - infra
+
+  minio:
+    image: docker.io/bitnamilegacy/minio:2025.7.23-debian-12-r5
+    container_name: backend-minio
+    user: "0"
+    environment:
+      MINIO_ROOT_USER: ${S3__ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${S3__SECRET_KEY:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - mindata:/bitnami/minio/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+    profiles:
+      - infra
+
+volumes:
+  pgdata:
+  mindata:

@@ -1,0 +1,10 @@
+services:
+  cv-worker:
+    networks:
+      - default
+      - deploy-net
+
+networks:
+  deploy-net:
+    name: build-watch-deploy_default
+    external: true

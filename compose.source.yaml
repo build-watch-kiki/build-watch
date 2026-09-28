@@ -1,0 +1,55 @@
+x-backend-source: &backend-source
+  image: build-watch-backend:submission-source
+  build:
+    context: ../backend
+  pull_policy: build
+
+services:
+  build-watch-init:
+    <<: *backend-source
+
+  build-watch-backend:
+    <<: *backend-source
+
+  build-watch-backend-worker:
+    <<: *backend-source
+
+  build-watch-model-init:
+    <<: *backend-source
+    container_name: build-watch-model-init
+    entrypoint: ["python", "/scripts/seed_model.py"]
+    env_file:
+      - .env
+    environment:
+      S3__ENDPOINT: ${S3__ENDPOINT:-http://minio:9000}
+      S3__CV_BUCKET: ${S3__CV_BUCKET:-buildwatch-cv}
+    volumes:
+      - ../scripts/seed_model.py:/scripts/seed_model.py:ro
+      - ../model-manifest.json:/scripts/model-manifest.json:ro
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: "no"
+    profiles:
+      - cv
+      - full
+
+  build-watch-cv:
+    image: build-watch-cv:submission-source
+    build:
+      context: ../cv
+    pull_policy: build
+    environment:
+      S3__CV_BUCKET: ${S3__CV_BUCKET:-buildwatch-cv}
+      S3__MODEL_VERSION: v3
+    depends_on:
+      build-watch-model-init:
+        condition: service_completed_successfully
+
+  build-watch-frontend:
+    image: build-watch-frontend:submission-source
+    build:
+      context: ../frontend
+      args:
+        VITE_SHOW_MOCK_PROJECT: "false"
+    pull_policy: build

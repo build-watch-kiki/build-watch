@@ -1,0 +1,14 @@
+.git/
+.github/
+.idea/
+.venv/
+.env
+.env.*
+__pycache__/
+*.py[cod]
+*.log
+*.pt
+*.onnx
+_cv_debug/
+.pytest_cache/
+tests/

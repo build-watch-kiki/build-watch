@@ -1,0 +1,68 @@
+name: Server Deploy
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: build-watch-prototype-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          lfs: false
+          submodules: false
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_PAT }}
+
+      - name: Create .env file
+        run: |
+          printf '%s' "${{ secrets.ENV_FILE }}" > .env
+          if [ ! -s .env ]; then
+            echo "::error::ENV_FILE secret is empty — add Repository secret ENV_FILE with full .env content"
+            exit 1
+          fi
+          echo ".env created from secret (masked)"
+          grep -v PASSWORD .env | grep -v SECRET | cat || true
+          docker compose \
+            -f docker-compose.yaml \
+            --profile full --profile infra config > /dev/null
+          echo "prototype compose config ok"
+          echo "Resolved images:"
+          docker compose \
+            -f docker-compose.yaml \
+            --profile full --profile infra config --images
+
+      - name: Pull and Restart via Docker Compose
+        run: |
+          echo "Prototype deployment started. Pulling versioned images..."
+          docker compose \
+            -f docker-compose.yaml \
+            --profile full --profile infra pull
+
+          echo "Starting containers..."
+          docker compose \
+            -f docker-compose.yaml \
+            --profile full --profile infra up -d --remove-orphans
+
+          echo "Waiting for containers and healthchecks..."
+          docker compose \
+            -f docker-compose.yaml \
+            --profile full --profile infra up -d --wait --wait-timeout 120
+
+          echo "Current status..."
+          docker compose \
+            -f docker-compose.yaml \
+            --profile full --profile infra ps
+
+          echo "Cleaning up..."
+          docker image prune -f

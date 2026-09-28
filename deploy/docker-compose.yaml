@@ -1,0 +1,137 @@
+services:
+  build-watch-init:
+    image: ghcr.io/build-watch-kiki/build-watch-backend:${BACKEND_VERSION:-1.0.4}
+    container_name: build-watch-init
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        until alembic upgrade head; do
+          echo "[init] Database is not ready; retrying in 2 seconds..."
+          sleep 2
+        done
+        python -m buildwatch.utils.seed
+    env_file:
+      - .env
+    environment: &backend_environment
+      DB__HOST: ${DB__HOST:-postgres}
+      BROKER__HOST: ${BROKER__HOST:-rabbitmq}
+      BROKER__QUEUE__NEW_PHOTO: ${BROKER__QUEUE__NEW_PHOTO:-new-photo}
+      S3__ENDPOINT: ${S3__ENDPOINT:-http://minio:9000}
+    restart: "no"
+
+  build-watch-backend:
+    image: ghcr.io/build-watch-kiki/build-watch-backend:${BACKEND_VERSION:-1.0.4}
+    container_name: build-watch-backend
+    env_file:
+      - .env
+    environment:
+      <<: *backend_environment
+      RUN_MIGRATIONS: "0"
+    ports:
+      - "${RUN__PORT:-8000}:8000"
+    depends_on:
+      build-watch-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  build-watch-backend-worker:
+    image: ghcr.io/build-watch-kiki/build-watch-backend:${BACKEND_VERSION:-1.0.4}
+    container_name: build-watch-backend-worker
+    command: ["faststream", "run", "buildwatch.worker:app"]
+    env_file:
+      - .env
+    environment:
+      <<: *backend_environment
+      RUN_MIGRATIONS: "0"
+    depends_on:
+      build-watch-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  build-watch-cv:
+    image: ghcr.io/build-watch-kiki/build-watch-cv:${CV_VERSION:-1.0.2}
+    container_name: build-watch-cv
+    env_file:
+      - .env
+    environment:
+      BROKER__HOST: ${BROKER__HOST:-rabbitmq}
+      BROKER__QUEUE__NEW_PHOTOS: ${BROKER__QUEUE__NEW_PHOTO:-new-photo}
+      S3__ENDPOINT: ${S3__ENDPOINT:-http://minio:9000}
+      DB__HOST: ${DB__HOST:-postgres}
+    restart: unless-stopped
+    profiles:
+      - cv
+      - full
+
+  build-watch-frontend:
+    image: ghcr.io/build-watch-kiki/build-watch-frontend:${FRONTEND_VERSION:-1.0.2}
+    container_name: build-watch-frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:5173"
+    environment:
+      API_BASE_URL: ${API_BASE_URL:-/api/}
+      BACKEND_URL: ${BACKEND_URL:-http://build-watch-backend:8000}
+      S3_PROXY_TARGET: ${S3__ENDPOINT:-http://minio:9000}
+      S3_SIGNED_ORIGIN: ${S3__ENDPOINT:-http://minio:9000}
+      FRONTEND_ALLOWED_HOSTS: ${FRONTEND_ALLOWED_HOSTS:-}
+    depends_on:
+      - build-watch-backend
+    restart: unless-stopped
+    profiles:
+      - frontend
+      - full
+
+  postgres:
+    image: postgres@sha256:5a5a84b19854a9ffaa54082c166ff4ec27473a361e496e5ea167f298f2da9722
+    container_name: build-watch-db
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${DB__NAME:-build-watch-db}
+      POSTGRES_USER: ${DB__USER:-postgres}
+      POSTGRES_PASSWORD: ${DB__PASSWORD:-postgres}
+    ports:
+      - "${DB__PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql
+    restart: unless-stopped
+    profiles:
+      - infra
+
+  rabbitmq:
+    image: rabbitmq@sha256:606d8c0d6b3c18d1da9afc53bc7cdb2a8d5486df91b5a9830e9e07626c9ae281
+    container_name: build-watch-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${BROKER__USERNAME:-guest}
+      RABBITMQ_DEFAULT_PASS: ${BROKER__PASSWORD:-guest}
+    ports:
+      - "${BROKER__PORT:-5672}:5672"
+      - "15672:15672"
+    restart: unless-stopped
+    profiles:
+      - infra
+
+  minio:
+    image: docker.io/bitnamilegacy/minio@sha256:50cec18ac4184af4671a78aedd5554942c8ae105d51a465fa82037949046da01
+    container_name: build-watch-minio
+    environment:
+      MINIO_ROOT_USER: ${S3__ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${S3__SECRET_KEY:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - miniodata:/bitnami/minio/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+    profiles:
+      - infra
+
+volumes:
+  pgdata:
+  miniodata:

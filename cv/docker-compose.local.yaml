@@ -1,0 +1,5 @@
+services:
+  cv-worker:
+    environment:
+      BROKER__HOST: rabbitmq
+      S3__ENDPOINT: http://minio:9000

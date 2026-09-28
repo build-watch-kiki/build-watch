@@ -1,0 +1,5 @@
+# Preserve each imported repository's committed bytes, including line endings.
+backend/** -text
+cv/** -text
+frontend/** -text
+deploy/** -text
