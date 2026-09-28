@@ -39,6 +39,22 @@ STORAGE_IMAGE_FORMAT = "WEBP"
 STORAGE_IMAGE_CONTENT_TYPE = "image/webp"
 WEBP_QUALITY = 90
 WEBP_METHOD = 6
+# Допуск на рассинхрон часов клиента/сервера при проверке "даты из будущего".
+FUTURE_SKEW = timedelta(minutes=5)
+
+
+def normalize_captured_at(value: datetime | date) -> datetime:
+    """Привести ручную дату к aware datetime в UTC.
+
+    date -> midnight UTC, naive datetime -> UTC, aware -> astimezone(UTC).
+    """
+    if isinstance(value, datetime):
+        normalized = value
+    else:
+        normalized = datetime.combine(value, time.min)
+    if normalized.tzinfo is None:
+        return normalized.replace(tzinfo=timezone.utc)
+    return normalized.astimezone(timezone.utc)
 
 
 @dataclass(frozen=True, slots=True)
@@ -206,8 +222,22 @@ class PhotosService:
             message_data.filename,
         )
 
-    async def upload_photo(self, file: UploadFile, project_id: int) -> int:
+    async def upload_photo(
+        self,
+        file: UploadFile,
+        project_id: int,
+        captured_at: datetime | date | None = None,
+    ) -> int:
         await self._verify_project_exists(project_id)
+
+        captured_at_override: datetime | None = None
+        if captured_at is not None:
+            captured_at_override = normalize_captured_at(captured_at)
+            if captured_at_override > datetime.now(timezone.utc) + FUTURE_SKEW:
+                raise BuildWatchException(
+                    detail="Дата снимка не может быть в будущем",
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                )
 
         if file.content_type not in IMAGE_CONTENT_TYPES.values():
             raise BuildWatchException(
@@ -227,6 +257,10 @@ class PhotosService:
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
         metadata = self._extract_image_metadata(content, file.filename)
+        # Ручная дата важнее EXIF: если передана — перезаписывает метаданные.
+        captured_at_final = (
+            captured_at_override if captured_at_override is not None else metadata.created_at
+        )
         content_type = IMAGE_CONTENT_TYPES[metadata.format]
         if file.content_type != content_type:
             raise BuildWatchException(
@@ -245,7 +279,7 @@ class PhotosService:
             photo_id = await self.db_manager.photos_repo.create_photo(
                 project_id=project_id,
                 storage_key=object_path,
-                captured_at=metadata.created_at,
+                captured_at=captured_at_final,
                 width=metadata.width,
                 height=metadata.height,
                 format=metadata.format,
@@ -275,7 +309,7 @@ class PhotosService:
             width=metadata.width,
             height=metadata.height,
             format=metadata.format,
-            created_at=metadata.created_at,
+            created_at=captured_at_final,
             uploaded_at=uploaded_at,
         )
         logger.info(message_data.model_dump())

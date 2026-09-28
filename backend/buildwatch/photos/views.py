@@ -1,4 +1,7 @@
-from fastapi import APIRouter, UploadFile, File, Query
+from datetime import datetime
+from typing import Annotated
+
+from fastapi import APIRouter, UploadFile, File, Form, Query
 from fastapi import status
 
 from buildwatch.photos.schemas import PhotoResponse, PhotoUploadResponse
@@ -17,9 +20,14 @@ router = APIRouter(prefix="/projects/{project_id}/photos", tags=["Снимки"]
     response_model=PhotoUploadResponse,
 )
 async def load_photos(
-    photo_service: PhotosServiceDep, project_id: int, file: UploadFile = File(...)
+    photo_service: PhotosServiceDep,
+    project_id: int,
+    file: UploadFile = File(...),
+    captured_at: Annotated[datetime | None, Form(alias="capturedAt")] = None,
 ):
-    photo_id = await photo_service.upload_photo(file=file, project_id=project_id)
+    photo_id = await photo_service.upload_photo(
+        file=file, project_id=project_id, captured_at=captured_at
+    )
     return PhotoUploadResponse(id=photo_id)
 
 
