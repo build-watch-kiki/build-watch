@@ -1,5 +1,5 @@
 x-backend-source: &backend-source
-  image: build-watch-backend:submission-source
+  image: build-watch-backend:source
   build:
     context: ../backend
   pull_policy: build
@@ -40,20 +40,20 @@ services:
       - full
 
   build-watch-cv:
-    image: build-watch-cv:submission-source
+    image: build-watch-cv:source
     container_name: build-watch-source-cv
     build:
       context: ../cv
     pull_policy: build
     environment:
       S3__CV_BUCKET: ${S3__CV_BUCKET:-buildwatch-cv}
-      S3__MODEL_VERSION: v3
+      S3__MODEL_VERSION: v2
     depends_on:
       build-watch-model-init:
         condition: service_completed_successfully
 
   build-watch-frontend:
-    image: build-watch-frontend:submission-source
+    image: build-watch-frontend:source
     container_name: build-watch-source-frontend
     build:
       context: ../frontend

@@ -8,12 +8,24 @@ export const UPLOAD_CONCURRENCY = 3
 
 export type PhotoUploadStatus = 'queued' | 'uploading' | 'accepted' | 'error'
 
+export interface PhotoUploadEntry {
+  file: File
+  /** Дата снимка YYYY-MM-DD, null — не указана. */
+  capturedAt: string | null
+}
+
 export interface PhotoUploadItem {
   key: string
   file: File
+  capturedAt: string | null
   status: PhotoUploadStatus
   id?: number
   error?: string
+}
+
+/** Дата из date-инпута → полночь UTC ISO. */
+export function toCapturedAtIso(date: string): string {
+  return `${date}T00:00:00.000Z`
 }
 
 export async function fetchPhotos(
@@ -29,13 +41,17 @@ export async function fetchPhotos(
 
 export async function uploadPhoto(
   projectId: number,
-  file: File
+  file: File,
+  capturedAt?: string | null
 ): Promise<number> {
   if (isMockProject(projectId)) {
-    return addMockPhotoFromFile(file).id
+    return addMockPhotoFromFile(file, capturedAt).id
   }
   const body = new FormData()
   body.append('file', file)
+  if (capturedAt) {
+    body.append('capturedAt', toCapturedAtIso(capturedAt))
+  }
   // Axios/browser supplies the multipart boundary. Do not force Content-Type.
   const response = await api.post<{ id: number }>(
     `/projects/${projectId}/photos`,
@@ -63,13 +79,14 @@ function errorMessage(error: unknown): string {
 
 export async function uploadPhotoBatch(
   projectId: number,
-  files: File[],
+  entries: PhotoUploadEntry[],
   onProgress?: (items: PhotoUploadItem[]) => void,
   concurrency = UPLOAD_CONCURRENCY
 ): Promise<PhotoUploadItem[]> {
-  const items: PhotoUploadItem[] = files.map((file, index) => ({
-    key: `${file.name}:${file.size}:${file.lastModified}:${index}`,
-    file,
+  const items: PhotoUploadItem[] = entries.map((entry, index) => ({
+    key: `${entry.file.name}:${entry.file.size}:${entry.file.lastModified}:${index}`,
+    file: entry.file,
+    capturedAt: entry.capturedAt,
     status: 'queued'
   }))
   let cursor = 0
@@ -83,7 +100,7 @@ export async function uploadPhotoBatch(
       item.status = 'uploading'
       publish()
       try {
-        item.id = await uploadPhoto(projectId, item.file)
+        item.id = await uploadPhoto(projectId, item.file, item.capturedAt)
         item.status = 'accepted'
       } catch (error) {
         item.status = 'error'

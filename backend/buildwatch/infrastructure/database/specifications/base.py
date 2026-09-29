@@ -1,4 +1,4 @@
-from sqlalchemy import Select, asc, desc as sa_desc, false
+from sqlalchemy import Select, asc, desc as sa_desc, false, or_
 
 
 class Specification:
@@ -51,6 +51,24 @@ class LikeSpec(Specification):
         if self.case_insensitive:
             return query.filter(column.ilike(search_value))
         return query.filter(column.like(search_value))
+
+
+class OrLikeSpec(Specification):
+    """ILIKE-поиск сразу по нескольким колонкам (OR)"""
+
+    def __init__(self, cols, value: str | None, case_insensitive: bool = True):
+        self.cols = tuple(cols)
+        self.value = value
+        self.case_insensitive = case_insensitive
+
+    def apply(self, query: Select) -> Select:
+        """Применение фильтра LIKE (OR по колонкам) к запросу"""
+        search_value = f"%{self.value}%" if self.value else "%"
+        conds = [
+            col.ilike(search_value) if self.case_insensitive else col.like(search_value)
+            for col in self.cols
+        ]
+        return query.filter(or_(*conds))
 
 
 class LimitOffsetSpec(Specification):

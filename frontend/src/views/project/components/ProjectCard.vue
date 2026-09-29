@@ -1,9 +1,10 @@
 <script setup lang="ts">
   import type { Project } from '@/types/projects'
   import { displayDate } from '@/utils/datetime'
+  import { getProjectTypeIcon } from '@/utils/projectTypes'
   import { useProjectsStore } from '@/store/projects'
   const cardProps = defineProps<{ project: Project }>()
-  const emit = defineEmits<{ delete: [] }>()
+  const emit = defineEmits<{ delete: []; edit: [] }>()
 
   let warmed = false
   function warmProject() {
@@ -28,7 +29,10 @@
   >
     <div class="project-card__top">
       <span class="project-card__icon"
-        ><v-icon icon="mdi-office-building-outline" size="24" /></span
+        ><v-icon
+          :icon="getProjectTypeIcon(project.projectType?.id)"
+          size="24"
+        ></v-icon></span
       ><span class="project-card__id"
         >Объект / {{ String(project.id).padStart(3, '0') }}</span
       ><v-menu
@@ -41,6 +45,9 @@
             :aria-label="`Действия с объектом ${project.name}`" /></template
         ><v-list
           ><v-list-item
+            title="Редактировать объект"
+            prepend-icon="mdi-pencil-outline"
+            @click="emit('edit')" /><v-list-item
             title="Удалить объект"
             prepend-icon="mdi-delete-outline"
             class="text-error"

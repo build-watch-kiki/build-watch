@@ -6,6 +6,7 @@ from .base import (
     LikeSpec,
     LimitOffsetSpec,
     OrderBySpec,
+    OrLikeSpec,
     Specification,
 )
 
@@ -17,5 +18,6 @@ __all__ = (
     "LikeSpec",
     "LimitOffsetSpec",
     "OrderBySpec",
+    "OrLikeSpec",
     "Specification",
 )

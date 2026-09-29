@@ -158,7 +158,13 @@ export const useProjectSnapshotsStore = defineStore('ProjectSnapshotsStore', {
         if (!(file instanceof File)) {
           throw new Error('Mock upload expects a "file" field')
         }
-        return { id: addMockPhotoFromFile(file).id }
+        const capturedAt = payload.get('capturedAt')
+        return {
+          id: addMockPhotoFromFile(
+            file,
+            typeof capturedAt === 'string' && capturedAt ? capturedAt : null
+          ).id
+        }
       }
       try {
         this.loading.action = true

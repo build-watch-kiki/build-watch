@@ -43,6 +43,7 @@
   const selectedItem = ref<Project | null>(null)
   const showModals = ref<Record<string, boolean>>({
     create: false,
+    edit: false,
     delete: false
   })
   async function loadInitialList() {
@@ -116,6 +117,26 @@
   }
   function handleCreateCancel() {
     showModals.value.create = false
+    actionError.value = null
+  }
+  async function handleEditOk(data: CreateProjectPayload) {
+    if (!selectedItem.value) return
+    actionError.value = null
+    try {
+      await projectsStore.updateItem({ projectId: selectedItem.value.id }, data)
+      showModals.value.edit = false
+      selectedItem.value = null
+      await loadInitialList()
+    } catch (error) {
+      actionError.value = getApiErrorDetail(
+        error,
+        'Не удалось сохранить объект'
+      )
+    }
+  }
+  function handleEditCancel() {
+    showModals.value.edit = false
+    selectedItem.value = null
     actionError.value = null
   }
   onMounted(() => {
@@ -226,6 +247,7 @@
             v-for="project in list"
             :key="project.id"
             :project="project"
+            @edit="openActionDialog('edit', project)"
             @delete="openActionDialog('delete', project)"
           />
         </div>
@@ -255,6 +277,14 @@
       :error="actionError"
       @ok="handleCreateOk"
       @cancel="handleCreateCancel"
+    />
+    <CreateProjectDialog
+      :open="showModals.edit"
+      :loading="loading.action"
+      :error="actionError"
+      :project="selectedItem"
+      @ok="handleEditOk"
+      @cancel="handleEditCancel"
     />
     <DeleteProjectConfirmDialog
       :open="showModals.delete"

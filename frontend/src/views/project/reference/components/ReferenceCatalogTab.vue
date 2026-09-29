@@ -82,10 +82,12 @@
 
   async function load() {
     error.value = null
+    // v-text-field с clearable ставит null вместо '' — гасим, иначе trim упадёт.
+    const query = (search.value ?? '').trim()
     const params = {
       page: page.value,
       pageSize: itemsPerPage.value,
-      ...(search.value.trim() ? { search_value: search.value.trim() } : {})
+      ...(query ? { search_value: query } : {})
     }
     try {
       switch (props.catalog) {

@@ -10,7 +10,9 @@ import type {
 import type {
   CreateProjectPayload,
   CreateProjectResponse,
-  ProjectPathParams
+  ProjectPathParams,
+  UpdateProjectPayload,
+  UpdateProjectResponse
 } from '@/types/projects.actions.ts'
 
 type State = DefaultStorePaginatedState<Project, DefaultStoreLoadingActionState>
@@ -70,6 +72,35 @@ export const useProjectsStore = defineStore('ProjectsStore', {
         this.loading.action = true
         const { data } = await api.post<CreateProjectResponse>(
           '/projects',
+          payload
+        )
+        return data
+      } finally {
+        this.loading.action = false
+      }
+    },
+    async updateItem(
+      { projectId }: ProjectPathParams,
+      payload: UpdateProjectPayload
+    ): Promise<UpdateProjectResponse> {
+      if (isMockProject(projectId)) {
+        const updated: Project = {
+          ...(this.detail?.id === projectId
+            ? this.detail
+            : (this.list.find((project) => project.id === projectId) ??
+              MOCK_PROJECT)),
+          ...payload
+        }
+        this.list = this.list.map((project) =>
+          project.id === projectId ? updated : project
+        )
+        if (this.detail?.id === projectId) this.detail = updated
+        return updated
+      }
+      try {
+        this.loading.action = true
+        const { data } = await api.put<UpdateProjectResponse>(
+          `/projects/${projectId}`,
           payload
         )
         return data

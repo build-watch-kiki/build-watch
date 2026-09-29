@@ -1,7 +1,13 @@
 <script setup lang="ts">
   import { computed, ref, watch } from 'vue'
   import DataFormDialog from '@/components/DataFormDialog.vue'
-  import { MAX_UPLOAD_BATCH, type PhotoUploadItem } from '@/services/photos.ts'
+  import { displayDate } from '@/utils/datetime'
+  import type { DateString } from '@/types/api.ts'
+  import {
+    MAX_UPLOAD_BATCH,
+    type PhotoUploadEntry,
+    type PhotoUploadItem
+  } from '@/services/photos.ts'
   import {
     ACCEPTED_PHOTO_ACCEPT,
     ACCEPTED_PHOTO_TYPES,
@@ -13,16 +19,22 @@
     loading: boolean
     error: string | null
     items: PhotoUploadItem[]
+    minDate?: DateString | null
+    maxDate?: DateString | null
   }
 
-  const props = defineProps<Props>()
+  const props = withDefaults(defineProps<Props>(), {
+    minDate: null,
+    maxDate: null
+  })
 
   const emit = defineEmits<{
-    ok: [files: File[]]
+    ok: [entries: PhotoUploadEntry[]]
     cancel: []
   }>()
 
   const files = ref<File[]>([])
+  const dates = ref<Record<string, string>>({})
   const isDragging = ref(false)
   const fileInputRef = ref<HTMLInputElement | null>(null)
 
@@ -43,8 +55,33 @@
       return `За один раз можно загрузить не более ${MAX_UPLOAD_BATCH} файлов`
     }
     const invalid = files.value.find((file) => validatePhoto(file))
-    return invalid ? `${invalid.name}: ${validatePhoto(invalid)}` : null
+    if (invalid) {
+      return `${invalid.name}: ${validatePhoto(invalid)}`
+    }
+    const outOfRange = files.value.find((file) => dateRangeError(getDate(file)))
+    if (outOfRange) {
+      return `${outOfRange.name}: ${dateRangeError(getDate(outOfRange))}`
+    }
+    return null
   })
+
+  function dateRangeError(date: string): string | null {
+    if (!date) return null
+    if (props.minDate && date < props.minDate) return rangeMessage()
+    if (props.maxDate && date > props.maxDate) return rangeMessage()
+    return null
+  }
+
+  function rangeMessage(): string {
+    const from = props.minDate ? displayDate(props.minDate) : '…'
+    const to = props.maxDate ? displayDate(props.maxDate) : '…'
+    return `Дата снимка должна быть с ${from} по ${to}`
+  }
+
+  function dateRules(value: string | null): true | string {
+    if (!value) return true
+    return dateRangeError(value) ?? true
+  }
 
   function fileKey(file: File): string {
     return `${file.name}:${file.size}:${file.lastModified}`
@@ -66,7 +103,27 @@
   }
 
   function removeFile(index: number) {
+    const removed = files.value[index]
     files.value = files.value.filter((_, i) => i !== index)
+    if (removed) {
+      const next = { ...dates.value }
+      delete next[fileKey(removed)]
+      dates.value = next
+    }
+  }
+
+  function getDate(file: File): string {
+    return dates.value[fileKey(file)] ?? ''
+  }
+
+  function setDate(file: File, value: string | null) {
+    const next = { ...dates.value }
+    if (value) {
+      next[fileKey(file)] = value
+    } else {
+      delete next[fileKey(file)]
+    }
+    dates.value = next
   }
 
   function openPicker() {
@@ -88,6 +145,7 @@
 
   function resetForm() {
     files.value = []
+    dates.value = {}
     isDragging.value = false
     if (fileInputRef.value) fileInputRef.value.value = ''
   }
@@ -101,7 +159,13 @@
 
   async function handleOk() {
     if (dropError.value || !files.value.length) return
-    emit('ok', files.value)
+    emit(
+      'ok',
+      files.value.map((file) => ({
+        file,
+        capturedAt: dates.value[fileKey(file)] || null
+      }))
+    )
   }
 
   function handleCancel() {
@@ -158,24 +222,47 @@
         />
       </div>
       <div v-if="files.length" class="upload-files">
-        <v-chip
+        <div
           v-for="(file, idx) in files"
           :key="`${file.name}:${file.size}:${file.lastModified}`"
-          closable
-          size="small"
-          class="upload-files__chip"
-          :disabled="props.loading"
-          @click:close="removeFile(idx)"
+          class="upload-file-row"
         >
-          {{ file.name }}
-        </v-chip>
+          <span class="upload-file-row__name" :title="file.name">{{
+            file.name
+          }}</span>
+          <v-text-field
+            :model-value="getDate(file)"
+            label="Дата снимка"
+            type="date"
+            clearable
+            :min="props.minDate ?? undefined"
+            :max="props.maxDate ?? undefined"
+            :rules="[dateRules]"
+            hide-details="auto"
+            density="compact"
+            variant="outlined"
+            class="upload-file-row__date"
+            :disabled="props.loading"
+            @update:model-value="setDate(file, $event)"
+          />
+          <v-btn
+            icon="mdi-close"
+            variant="text"
+            density="comfortable"
+            size="small"
+            :disabled="props.loading"
+            :aria-label="`Убрать ${file.name}`"
+            @click="removeFile(idx)"
+          />
+        </div>
       </div>
       <p v-if="dropError && files.length" class="upload-error text-error">
         {{ dropError }}
       </p>
       <p class="upload-note">
         До {{ MAX_UPLOAD_BATCH }} файлов JPEG или PNG, не более 20 МБ каждый.
-        Одновременно можно загрузить до трёх файлов.
+        Одновременно можно загрузить до трёх файлов. Дату снимка можно указать
+        для каждого файла отдельно, это необязательно.
       </p>
       <div v-if="props.items.length" class="upload-progress" aria-live="polite">
         <div class="upload-progress__summary">
@@ -279,9 +366,30 @@
 
   .upload-files {
     display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
+    flex-direction: column;
+    gap: 8px;
     margin-top: 12px;
+  }
+
+  .upload-file-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .upload-file-row__name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+  }
+
+  .upload-file-row__date {
+    width: 170px;
+    flex-shrink: 0;
   }
 
   .upload-error {

@@ -1,24 +1,29 @@
 <script setup lang="ts">
   import DataFormDialog from '@/components/DataFormDialog.vue'
   import type { CreateProjectPayload } from '@/types/projects.actions.ts'
-  import { ref, watch } from 'vue'
+  import { computed, ref, watch } from 'vue'
   import type { DateString } from '@/types/api.ts'
   import { useCatalogsStore } from '@/store/catalogs.ts'
-  import type { ProjectType } from '@/types/projects.ts'
+  import type { Project, ProjectType } from '@/types/projects.ts'
   import CatalogSelector from '@/components/CatalogSelector.vue'
 
   interface Props {
     open: boolean
     loading: boolean
     error: string | null
+    project?: Project | null
   }
 
-  const props = defineProps<Props>()
+  const props = withDefaults(defineProps<Props>(), {
+    project: null
+  })
 
   const emit = defineEmits<{
     ok: [data: CreateProjectPayload]
     cancel: []
   }>()
+
+  const isEdit = computed(() => props.project !== null)
 
   const catalogStore = useCatalogsStore()
 
@@ -40,12 +45,27 @@
     endDate: tomorrowIso
   })
 
+  const typeSelectedItem = computed<ProjectType | null>(() =>
+    props.project?.projectType?.name
+      ? ({ name: props.project.projectType.name } as ProjectType)
+      : null
+  )
+
   const resetForm = () => {
-    dataObject.value = {
-      name: '',
-      type: null as unknown as string,
-      startDate: todayIso,
-      endDate: tomorrowIso
+    if (props.project) {
+      dataObject.value = {
+        name: props.project.name,
+        type: props.project.projectType?.name as string,
+        startDate: props.project.startDate,
+        endDate: props.project.endDate
+      }
+    } else {
+      dataObject.value = {
+        name: '',
+        type: null as unknown as string,
+        startDate: todayIso,
+        endDate: tomorrowIso
+      }
     }
   }
 
@@ -89,7 +109,7 @@
   watch(
     () => props.open,
     (open) => {
-      if (!open) resetForm()
+      if (open) resetForm()
     }
   )
 </script>
@@ -99,8 +119,8 @@
     :open="props.open"
     :data-object="dataObject"
     :labels="{
-      title: 'Новый строительный объект',
-      ok: 'Создать объект'
+      title: isEdit ? 'Редактировать объект' : 'Новый строительный объект',
+      ok: isEdit ? 'Сохранить' : 'Создать объект'
     }"
     :loading="props.loading"
     :error="props.error"
@@ -121,11 +141,12 @@
       <CatalogSelector
         v-model="dataObject.type"
         :catalog="projectTypesCatalog"
+        :selected-item="typeSelectedItem"
         :allow-search="true"
         item-value="name"
         item-title="name"
         label="Тип проекта"
-        :placeholder="'Выберите тип проекта'"
+        placeholder="Выберите тип проекта"
         :rules="typeRules"
         :disabled="props.loading"
         :clearable="false"

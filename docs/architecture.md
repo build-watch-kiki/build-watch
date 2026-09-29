@@ -47,6 +47,6 @@ Frontend ───────► Backend API ───────► PostgreSQ
 собираются из каталогов этого репозитория; инфраструктурные образы закреплены
 по digest. Compose ждёт успешного завершения `build-watch-init` перед запуском
 API и backend worker, а CV стартует после `build-watch-model-init`. Последний
-скачивает публичные веса `v3`, сверяет SHA-256 из `model-manifest.json` и
+копирует веса `v2` из настроенного S3, сверяет SHA-256 из `model-manifest.json` и
 загружает модель в MinIO. PostgreSQL и MinIO используют именованные volumes,
 поэтому данные сохраняются при перезапуске контейнеров.

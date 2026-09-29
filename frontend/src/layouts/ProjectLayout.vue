@@ -6,6 +6,7 @@
   import type { NavItem } from '@/types/navigation'
   import { displayDate } from '@/utils/datetime'
   import { getApiErrorDetail } from '@/utils/errors'
+  import { getProjectTypeIcon } from '@/utils/projectTypes'
   import BrandMark from '@/components/BrandMark.vue'
 
   const props = defineProps<{ projectId: string }>()
@@ -198,9 +199,10 @@
       </div>
       <template #append
         ><span v-if="detail" class="project-topbar__type"
-          ><v-icon icon="mdi-office-building-outline" size="17" />{{
-            detail.projectType?.name
-          }}</span
+          ><v-icon
+            :icon="getProjectTypeIcon(detail.projectType?.id)"
+            size="17"
+          />{{ detail.projectType?.name }}</span
         ></template
       >
       <v-progress-linear

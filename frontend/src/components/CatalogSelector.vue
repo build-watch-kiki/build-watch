@@ -1,5 +1,13 @@
 <script setup lang="ts" generic="T">
-  import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
+  import {
+    computed,
+    onMounted,
+    onUnmounted,
+    ref,
+    shallowRef,
+    triggerRef,
+    watch
+  } from 'vue'
 
   import type { Catalog, PaginatedCatalog } from '@/types/catalogs'
   import NotFoundPlaceholder from '@/components/NotFoundPlaceholder.vue'
@@ -87,8 +95,10 @@
 
   const rootRef = ref<HTMLElement | null>(null)
   const menuWidth = shallowRef<number | undefined>(undefined)
+  const menuOpen = ref(false)
 
   function updateMenuWidth() {
+    if (menuOpen.value) return
     const el = rootRef.value
     if (el) {
       menuWidth.value = el.getBoundingClientRect().width
@@ -114,6 +124,13 @@
   const component = computed(() =>
     props.allowSearch ? 'v-autocomplete' : 'v-select'
   )
+
+  const menuProps = computed(() => ({
+    maxHeight: 320,
+    width: menuWidth.value,
+    maxWidth: menuWidth.value,
+    contentClass: 'catalog-selector-menu'
+  }))
 
   async function loadInitial() {
     if (props.selectedItem) {
@@ -184,17 +201,20 @@
       const catalog = props.catalog as PaginatedCatalog<T>
       const result = await catalog.next()
 
-      const resultKeys = new Set(
-        result.map((item) => getKey(item)).filter(Boolean)
+      // Базу не пересобираем: удаление узлов выше вьюпорта сбрасывает скролл
+      // меню наверх. Дубли отсекаем только из новой страницы, массив мутируем
+      // на месте с сохранением идентичности ссылки.
+      const baseKeys = new Set(
+        items.value.map((item) => getKey(item)).filter(Boolean)
       )
-      let base: T[] = items.value
-      if (resultKeys.size) {
-        base = base.filter((item) => {
-          const k = getKey(item)
-          return !k || !resultKeys.has(k)
-        })
+      for (const item of result) {
+        const key = getKey(item)
+        if (!key || !baseKeys.has(key)) {
+          items.value.push(item)
+          if (key) baseKeys.add(key)
+        }
       }
-      items.value = [...base, ...result]
+      triggerRef(items)
       done?.(catalog.hasMore ? 'ok' : 'empty')
     } catch {
       done?.('error')
@@ -403,6 +423,7 @@
     <component
       :is="component"
       v-model:search="search"
+      v-model:menu="menuOpen"
       :model-value="modelValue"
       :items="items"
       :loading="loading || catalogLoading ? 'primary' : false"
@@ -419,12 +440,7 @@
       :variant="variant"
       :filter="() => true"
       :autofocus="autofocus"
-      :menu-props="{
-        maxHeight: 320,
-        width: menuWidth,
-        maxWidth: menuWidth,
-        contentClass: 'catalog-selector-menu'
-      }"
+      :menu-props="menuProps"
       @update:model-value="handleModelUpdate"
       @click:clear="handleClear"
     >
@@ -476,5 +492,9 @@
     align-items: flex-start;
     padding-top: 8px;
     padding-bottom: 8px;
+  }
+
+  .catalog-selector-menu .v-infinite-scroll {
+    min-height: 40px;
   }
 </style>

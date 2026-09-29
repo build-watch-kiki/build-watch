@@ -9,6 +9,7 @@
   import { useProjectPlanStore } from '@/store/plan'
   import { useProjectsStore } from '@/store/projects'
   import type { CreateStagePayload } from '@/types/plan.actions'
+  import type { DateString } from '@/types/api.ts'
   import NoDataPlaceholder from '@/components/NoDataPlaceholder.vue'
 
   interface Props {
@@ -144,10 +145,29 @@
       if (pid) {
         const parent = planStore.getStageById(pid)
         if (parent) {
-          startDate.value = parent.startDate
-          const end = new Date(parent.startDate)
-          end.setDate(end.getDate() + 1)
-          endDate.value = end.toISOString().slice(0, 10)
+          const siblings = planStore.getList.filter(
+            (stage) => stage.parentId === pid
+          )
+          const prevEnd =
+            siblings.length > 0
+              ? siblings
+                  .map((stage) => stage.endDate)
+                  .sort()
+                  .at(-1)
+              : undefined
+          if (prevEnd && prevEnd < parent.endDate) {
+            const start = new Date(`${prevEnd}T00:00:00Z`)
+            start.setUTCDate(start.getUTCDate() + 1)
+            startDate.value = start.toISOString().slice(0, 10) as DateString
+            const end = new Date(start)
+            end.setUTCDate(end.getUTCDate() + 1)
+            endDate.value = end.toISOString().slice(0, 10) as DateString
+          } else {
+            startDate.value = parent.startDate
+            const end = new Date(parent.startDate)
+            end.setDate(end.getDate() + 1)
+            endDate.value = end.toISOString().slice(0, 10)
+          }
         } else {
           startDate.value = todayIso
           endDate.value = todayIso

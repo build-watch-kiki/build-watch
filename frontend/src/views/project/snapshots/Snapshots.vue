@@ -4,6 +4,7 @@
   import type { DataTableHeader } from 'vuetify/framework'
 
   import { useProjectSnapshotsStore } from '@/store/snapshots.ts'
+  import { useProjectsStore } from '@/store/projects.ts'
   import type { Snapshot } from '@/types/snapshots.ts'
   import { displayDate } from '@/utils/datetime'
   import { getApiErrorDetail } from '@/utils/errors'
@@ -14,7 +15,11 @@
     getDetectionsAvg,
     getObjectWord
   } from '@/utils/snapshots'
-  import { uploadPhotoBatch, type PhotoUploadItem } from '@/services/photos.ts'
+  import {
+    uploadPhotoBatch,
+    type PhotoUploadEntry,
+    type PhotoUploadItem
+  } from '@/services/photos.ts'
 
   import UploadSnapshotDialog from './components/UploadSnapshotDialog.vue'
   import LoadingPlaceholder from '@/components/LoadingPlaceholder.vue'
@@ -23,8 +28,23 @@
   const route = useRoute()
   const router = useRouter()
   const snapshotsStore = useProjectSnapshotsStore()
+  const projectsStore = useProjectsStore()
 
   const projectId = computed(() => Number(route.params.projectId))
+
+  const projectDetail = computed(() => projectsStore.getDetail)
+  const projectMinDate = computed(
+    () =>
+      (projectDetail.value?.id === projectId.value
+        ? projectDetail.value?.startDate
+        : null) ?? null
+  )
+  const projectMaxDate = computed(
+    () =>
+      (projectDetail.value?.id === projectId.value
+        ? projectDetail.value?.endDate
+        : null) ?? null
+  )
 
   const list = computed(() => snapshotsStore.getList)
   const loadingState = computed(() => snapshotsStore.getLoadingState)
@@ -197,20 +217,22 @@
     showUploadDialog.value = true
   }
 
-  async function handleUploadOk(files: File[]) {
+  async function handleUploadOk(entries: PhotoUploadEntry[]) {
     uploadLoading.value = true
     uploadError.value = null
     const accepted = uploadItems.value.filter(
       (item) => item.status === 'accepted'
     )
-    const retryFiles = uploadItems.value.some((item) => item.status === 'error')
+    const retryEntries: PhotoUploadEntry[] = uploadItems.value.some(
+      (item) => item.status === 'error'
+    )
       ? uploadItems.value
           .filter((item) => item.status === 'error')
-          .map((item) => item.file)
-      : files
+          .map((item) => ({ file: item.file, capturedAt: item.capturedAt }))
+      : entries
     const result = await uploadPhotoBatch(
       projectId.value,
-      retryFiles,
+      retryEntries,
       (items) => {
         uploadItems.value = [...accepted, ...items]
       }
@@ -539,6 +561,8 @@
       :loading="uploadLoading"
       :error="uploadError"
       :items="uploadItems"
+      :min-date="projectMinDate"
+      :max-date="projectMaxDate"
       @ok="handleUploadOk"
       @cancel="handleUploadCancel"
     />

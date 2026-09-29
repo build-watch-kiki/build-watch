@@ -3,7 +3,7 @@ from fastapi import Depends
 
 from buildwatch.infrastructure.database.manager import DBManager, DBManagerDep
 from buildwatch.infrastructure.database.models import TechniquesORM
-from buildwatch.infrastructure.database.specifications import LimitOffsetSpec, LikeSpec
+from buildwatch.infrastructure.database.specifications import LimitOffsetSpec, OrLikeSpec
 from buildwatch.shared.exceptions import NotFoundException
 from buildwatch.shared.schemas import SearchRequest
 from buildwatch.techniques.colors import resolve_color, validate_hex_color
@@ -25,14 +25,21 @@ class TechniqueService:
         offset = max(0, (request.page - 1) * request.page_size)
         techniques = await self.db_manager.technique_repo.get_techniques(
             LimitOffsetSpec(limit=request.page_size, offset=offset),
-            LikeSpec(col=TechniquesORM.name, value=request.search),
+            OrLikeSpec(
+                cols=(TechniquesORM.name, TechniquesORM.name_ru),
+                value=request.search,
+            ),
         )
         return [TechniqueResponse.model_validate(t) for t in techniques]
 
     async def get_techniques_count(self, request: SearchRequest) -> int:
         """Количество техники"""
         return await self.db_manager.technique_repo.get_count(
-            TechniquesORM, LikeSpec(col=TechniquesORM.name, value=request.search)
+            TechniquesORM,
+            OrLikeSpec(
+                cols=(TechniquesORM.name, TechniquesORM.name_ru),
+                value=request.search,
+            ),
         )
 
     async def create_technique(self, payload: TechniqueCreate) -> int:

@@ -51,13 +51,20 @@ export function getMockPhoto(photoId: number): PhotoResponse | undefined {
   return found ? clone(found) : undefined
 }
 
-export function addMockPhotoFromFile(file: File): PhotoResponse {
+export function addMockPhotoFromFile(
+  file: File,
+  capturedAt?: string | null
+): PhotoResponse {
   const id = photos.reduce((max, photo) => Math.max(max, photo.id), 100) + 1
   const item: PhotoResponse = {
     id,
     name: file.name,
     url: URL.createObjectURL(file),
-    capturedAt: nowIso(),
+    capturedAt: capturedAt
+      ? capturedAt.includes('T')
+        ? capturedAt
+        : `${capturedAt}T00:00:00.000Z`
+      : nowIso(),
     createdAt: nowIso(),
     isProcessed: true,
     processingStatus: 'succeeded',

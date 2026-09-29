@@ -2,25 +2,25 @@
 
 Build Watch - интеллектуальная система мониторинга строительной площадки для кейса № 7 хакатона «Лидеры цифровой трансформации 2026». Она принимает фотографии стройки, распознаёт технику, сопоставляет наблюдения с календарным планом и показывает руководителю фактический прогресс и отклонения.
 
-Этот репозиторий - точка входа для запуска проекта: здесь находятся Docker Compose для всех сервисов, инструкция для воспроизведения конкурсной версии, а также описание решения и архитектуры.
+Этот каталог содержит Docker Compose и настройки сервисов. Исходники приложений находятся в соседних каталогах `backend`, `cv` и `frontend`.
 
 ## Материалы
 
-- [Описание решения](docs/solution.md)
-- [Архитектура и поток данных](docs/architecture.md)
-- [Презентация](docs/presentation.pdf)
+- [Описание решения](../docs/solution.md)
+- [Архитектура и поток данных](../docs/architecture.md)
+- [Презентация](../docs/presentation.pdf)
 
 ## Запуск
 
-Этот способ запускает конкурсную версию: образы приложений указаны по версиям, а образы инфраструктуры закреплены по digest SHA-256.
+Запуск из исходников описан в [корневом README](../README.md#запуск). Образы инфраструктуры закреплены по digest SHA-256.
 
 Потребуются Docker Engine и Docker Compose v2.
+В `deploy/.env` задайте `MODEL_SOURCE_*` для S3 с `models/v2/best.pt`.
 
 ```bash
-git clone https://github.com/build-watch-kiki/build-watch-deploy.git
-cd build-watch-deploy
-cp .env.example .env
-docker compose -f docker-compose.yaml -f docker-compose.submission.yaml --profile full --profile infra up -d --wait
+cd build-watch
+cp deploy/.env.example deploy/.env
+docker compose --env-file deploy/.env -f deploy/docker-compose.yaml -f compose.source.yaml --profile full --profile infra up --build -d --wait
 ```
 
 При первом запуске одноразовый контейнер `build-watch-init` автоматически:
@@ -41,47 +41,24 @@ docker compose -f docker-compose.yaml -f docker-compose.submission.yaml --profil
 Проверка состояния и остановка:
 
 ```bash
-docker compose \
-  -f docker-compose.yaml \
-  -f docker-compose.submission.yaml \
+docker compose --env-file deploy/.env \
+  -f deploy/docker-compose.yaml -f compose.source.yaml \
   --profile full --profile infra ps
 
-docker compose \
-  -f docker-compose.yaml \
-  -f docker-compose.submission.yaml \
+docker compose --env-file deploy/.env \
+  -f deploy/docker-compose.yaml -f compose.source.yaml \
   --profile full --profile infra down
-```
-
-## Development-запуск
-
-Потребуются Docker Engine и Docker Compose v2.
-
-```bash
-git clone https://github.com/build-watch-kiki/build-watch-deploy.git
-cd build-watch-deploy
-cp .env.example .env
-docker compose --profile full --profile infra up -d
-```
-
-Пароли и порты задаются в `.env`. Для локального запуска замените значения `change_me` в созданном файле.
-
-Проверка состояния и остановка:
-
-```bash
-docker compose --profile full --profile infra ps
-docker compose --profile full --profile infra down
 ```
 
 ## Режимы образов
 
-Обычный compose сохраняет совместимость с процессом разработки. Переменная `VERSION` по умолчанию равна `latest`, поэтому новые сборки можно запускать без изменения конфигурации:
+Без `compose.source.yaml` базовый Compose использует образы из GHCR. Их версии задают `BACKEND_VERSION`, `CV_VERSION` и `FRONTEND_VERSION` в `deploy/.env`:
 
 ```bash
-docker compose --profile full up -d
-VERSION=sha-abcdef0 docker compose --profile full up -d
+docker compose --env-file deploy/.env -f deploy/docker-compose.yaml --profile full --profile infra up -d
 ```
 
-Для воспроизведения отправленной на хакатон версии используйте запуск для жюри в самом начале документа. `docker-compose.submission.yaml` не содержит плавающих тегов.
+При запуске с `compose.source.yaml` приложения собираются из локального кода.
 
 MinIO использует именованный volume `miniodata`: на чистом запуске он пустой, а фотографии сохраняются при пересоздании контейнера. Удаляйте volume через `down -v`, если нужен полный сброс.
 
@@ -94,7 +71,7 @@ Push в основные ветки компонентных репозитор�
 
 Git-тег формата `X.Y.Z` публикует одноимённый Docker-тег, не перемещая `latest`.
 
-Dev CI/CD использует только базовый `docker-compose.yaml` и автоматически разворачивает `latest` после push компонентных репозиториев. Ручной запуск workflow `Server Deploy` делает то же самое. Submission override не участвует в CI/CD и используется только в команде запуска для жюри в начале README.
+Сохранённый в `deploy/.github` workflow `Server Deploy` использует базовый `docker-compose.yaml` и версии из секрета `ENV_FILE`. В монорепозитории GitHub Actions не запускает workflow из вложенного каталога.
 
 ## Сервисы
 
