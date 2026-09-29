@@ -47,7 +47,7 @@ services:
     pull_policy: build
     environment:
       S3__CV_BUCKET: ${S3__CV_BUCKET:-buildwatch-cv}
-      S3__MODEL_VERSION: v2
+      S3__MODEL_VERSION: ${S3__MODEL_VERSION:-v2}
     depends_on:
       build-watch-model-init:
         condition: service_completed_successfully

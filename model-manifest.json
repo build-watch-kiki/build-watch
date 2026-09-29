@@ -1,5 +1,22 @@
 {
-  "version": "v2",
-  "object_key": "models/v2/best.pt",
-  "sha256": "033af020869e528cf7c4e21652506b704482e723fa2375c57791f4c811388a7a"
+  "models": [
+    {
+      "version": "v2",
+      "source_key": "models/v2/best.pt",
+      "object_key": "models/v2/best.pt",
+      "sha256": "033af020869e528cf7c4e21652506b704482e723fa2375c57791f4c811388a7a"
+    },
+    {
+      "version": "v3",
+      "source_key": "models/v3/best.pt",
+      "object_key": "models/v3/best.pt",
+      "sha256": "d382f9acca3ebc594a70a93ec9c9047ed05147094d07ae1a81f43be380526a7a"
+    },
+    {
+      "version": "v4",
+      "source_key": "models/v4/best_v4.pt",
+      "object_key": "models/v4/best.pt",
+      "sha256": "2de9ceae5723a4f73d995c6147d0e4f719907c9a4e0f40c856ff2d38f7ecd2cd"
+    }
+  ]
 }

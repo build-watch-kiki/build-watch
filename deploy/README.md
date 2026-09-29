@@ -15,7 +15,7 @@ Build Watch - интеллектуальная система мониторин
 Запуск из исходников описан в [корневом README](../README.md#запуск). Образы инфраструктуры закреплены по digest SHA-256.
 
 Потребуются Docker Engine и Docker Compose v2.
-В `deploy/.env` задайте `MODEL_SOURCE_*` для S3 с `models/v2/best.pt`.
+В `deploy/.env` задайте `MODEL_SOURCE_*` для S3 с весами v2, v3 и v4.
 
 ```bash
 cd build-watch
